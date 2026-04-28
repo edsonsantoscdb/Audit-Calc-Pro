@@ -1,0 +1,32 @@
+# Chave secreta do gerador (se criar arquivo local no PC)
+admin_secrets.py
+
+# Build (APKs, Flutter, site-packages)
+build/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+
+# IDE
+.idea/
+
+# Licença local
+.auditcalc_*.json
+.auditoria_banco.json
+
+# Cursor workspace
+.cursor/
+
+# Docs locais / segredos (não públicos)
+códigos github.txt
+Audit Calc Chave de Ativação.pdf
+"email de envio de chave.odt"
+"senha do gerador de senhas.odt"
+senha gerador de senhas.txt
+
+# Arquivo grande (>100MB - limite GitHub)
+site google.odt

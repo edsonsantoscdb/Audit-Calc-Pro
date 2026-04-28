@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audit-calc"
+version = "0.1.0"
+description = "Audit Calc — auditoria de financiamento"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "flet>=0.80.0",
+]
+
+# Só estes pacotes Python — evita erro de "multiple top-level packages" (desktop/, android/, etc.)
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["core*", "mobile_flet*"]
+
+[tool.setuptools]
+py-modules = ["main", "gerador_apk"]
+
+[tool.flet]
+product = "Audit Calc Pro"
+org = "com.auditcalcpro"
+icon = "assets/icon_pro.png"
+
+[tool.flet.app]
+path = "."
+module = "main"
+assets_dir = "assets"
+exclude = [
+    "desktop", "android", "extras", "build", ".git",
+    ".idea", "__pycache__", "*.odt", "*.egg-info",
+    "requirements.txt", "README.md", ".venv", "venv", "scripts",
+    "Gerador de Senhas.png",
+]
+
+[tool.flet.app.boot_screen]
+show = true
+message = "Preparando Audit Calc..."
+
+[tool.flet.app.startup_screen]
+show = true
+message = "Carregando..."

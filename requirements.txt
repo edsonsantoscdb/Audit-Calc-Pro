@@ -1,0 +1,10 @@
+# Instale na raiz do projeto: pip install -r requirements.txt
+#
+# --- Núcleo (motor financeiro: só Python puro em core/financeiro_puro.py) ---
+
+# --- Desktop (python desktop/interface.py) ---
+customtkinter>=5.2.0
+Pillow>=10.0.0
+
+# --- App Flet (python mobile_flet/app_mobile.py) — use Flet 0.80+ ---
+flet>=0.80.0
