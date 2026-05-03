@@ -1,3 +1,10 @@
 # O Mercado Pago não envia JWT do Supabase; desactivar verificação nesta função.
 [functions.mercadopago-webhook]
 verify_jwt = false
+
+[functions.mercadopago_webhook]
+verify_jwt = false
+
+# Chamada a partir da app Flet (POST público ou com anon no cliente).
+[functions.create_mercadopago_payment]
+verify_jwt = false

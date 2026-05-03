@@ -12,10 +12,11 @@ from datetime import datetime, timedelta, timezone
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+# Sem barra final: evita ...co//rest e ...co//functions (502 no gateway em alguns casos).
 SUPABASE_URL = os.environ.get(
     "SUPABASE_URL",
     "https://ynixfnrjxuqdhzcralvo.supabase.co",
-).strip()
+).strip().rstrip("/")
 SUPABASE_KEY = os.environ.get(
     "SUPABASE_ANON_KEY",
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
@@ -29,7 +30,7 @@ MERCADOPAGO_CHECKOUT_URL = os.environ.get("AUDITCALC_MP_CHECKOUT_URL", "").strip
 
 PAYMENT_MODE = "test"  # "test" ou "prod"
 
-unit_price = 54.90  # ou valor final definido
+unit_price = 5.00  # referência; cobrança = link MP ou Edge Function (valor teste/alíquota; produção pode subir)
 title = "Audit Calc - Licença Vitalícia"
 
 # Preferência MP: campo "metadata" (ex.: {"metadata": metadata} no JSON).
@@ -548,10 +549,11 @@ def _save_local(data_dir, chave, device_id, expira_em=None) -> bool:
     return ok
 
 
-def try_claim_license_after_mercadopago(data_dir) -> tuple[bool, str]:
+def try_claim_license_after_mercadopago(data_dir) -> tuple[bool, str | None]:
     """
-    Chama RPC claim_licenca_por_dispositivo (opcional), que deve devolver uma linha com chave
-    após o webhook do Mercado Pago ter registado o pagamento para este aparelho.
+    Fluxo opcional por chave: RPC claim_licenca_por_dispositivo quando existe pending_android_id.
+    Para licença só por e‑mail (+ validar_acesso), este passo pode não existir ou não aplicar —
+    nesse caso devolve (False, None) para o UI não insistir na chave manual.
     """
     device_id = _get_device_id()
     url = f"{SUPABASE_URL}/rest/v1/rpc/claim_licenca_por_dispositivo"
@@ -573,11 +575,11 @@ def try_claim_license_after_mercadopago(data_dir) -> tuple[bool, str]:
         except Exception:
             hint = corpo[:200]
         low = (hint + corpo).lower()
-        if e.code == 404 or "function" in low and "not exist" in low:
-            return False, (
-                "A verificação automática ainda não está ativa no servidor. "
-                "Introduza a chave manualmente ou contacte o suporte."
-            )
+        opcional_sem_rpc = e.code == 404 or (
+            "could not find" in low and "function" in low
+        ) or ("function" in low and ("not exist" in low or "does not exist" in low))
+        if opcional_sem_rpc:
+            return False, None
         return False, f"Não foi possível verificar agora (HTTP {e.code}). Tente de novo."
     except (URLError, OSError):
         return False, "Sem internet. Conecte-se e tente novamente."
@@ -739,6 +741,35 @@ def chamar_validar_acesso() -> tuple[dict | None, str | None]:
     return validar_acesso_remoto(get_email_salvo(), get_device_id())
 
 
+def chamar_validar_acesso_apos_checkout(
+    *,
+    max_tentativas: int = 5,
+    intervalo_seg: float = 2.0,
+) -> tuple[dict | None, str | None]:
+    """
+    Igual a chamar_validar_acesso, com várias tentativas espaçadas: o webhook do MP pode atualizar a
+    linha poucos segundos depois de o utilizador regressar ao app.
+    """
+    from mobile_flet.app_identity import get_device_id, get_email_salvo
+
+    em = get_email_salvo()
+    dev = get_device_id()
+    última_resp: dict | None = None
+    último_erro: str | None = None
+
+    for tentativa in range(max(1, int(max_tentativas))):
+        resp, err = validar_acesso_remoto(em, dev)
+        última_resp, último_erro = resp, err
+        if err == "rede":
+            return resp, err
+        if not err and resp and resp.get("status") == "liberado":
+            return resp, None
+        if tentativa < max_tentativas - 1:
+            time.sleep(max(0.4, float(intervalo_seg)))
+
+    return última_resp, último_erro
+
+
 def mensagem_pos_revalidacao(codigo: str) -> str:
     return {
         "expired": "Sua licença expirou. Adquira um novo passe e digite a nova chave.",
@@ -746,3 +777,49 @@ def mensagem_pos_revalidacao(codigo: str) -> str:
         "device": "Esta licença está vinculada a outro aparelho.",
         "invalid": "Licença não encontrada. Digite uma chave válida.",
     }.get(codigo, "")
+
+
+def get_create_mercadopago_payment_function_url() -> str:
+    """URL completa opcional; caso contrário usa SUPABASE_URL/functions/v1/create_mercadopago_payment."""
+    override = os.environ.get("AUDITCALC_MP_CREATE_PAYMENT_FUNCTION_URL", "").strip().rstrip("/")
+    if override:
+        return override
+    return f"{SUPABASE_URL}/functions/v1/create_mercadopago_payment"
+
+
+def criar_preferencia_mercadopago_via_edge(email: str) -> tuple[str | None, str | None]:
+    """
+    Chama Edge Function create_mercadopago_payment (POST JSON {"email"}).
+    Retorna (init_point, None) em caso de sucesso, ou (None, código interno não amigável).
+    Não altera BD nem estado local.
+    """
+    em = (email or "").strip()
+    if not em:
+        return None, "sem_email"
+
+    url = get_create_mercadopago_payment_function_url()
+    body = json.dumps({"email": em}).encode("utf-8")
+    req_headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        req = Request(url, data=body, headers=req_headers, method="POST")
+        with urlopen(req, timeout=35) as resp:
+            raw = resp.read().decode()
+    except HTTPError as e:
+        return None, f"http_{e.code}"
+    except (URLError, OSError):
+        return None, "rede"
+
+    try:
+        data = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        return None, "bad_json"
+
+    init = data.get("init_point")
+    if isinstance(init, str) and init.strip():
+        return init.strip(), None
+    return None, "sem_init_point"

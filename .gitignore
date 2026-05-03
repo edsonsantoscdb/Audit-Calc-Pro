@@ -18,6 +18,9 @@ venv/
 .auditcalc_*.json
 .auditoria_banco.json
 
+# Supabase CLI cache local (não versionar)
+supabase/.temp/
+
 # Cursor workspace
 .cursor/
 

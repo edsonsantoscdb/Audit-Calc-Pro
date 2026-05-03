@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import sys
@@ -26,6 +27,8 @@ from mobile_flet.supabase_license import (
     android_storage_candidate_dirs,
     chamar_consumir_auditoria,
     chamar_validar_acesso,
+    chamar_validar_acesso_apos_checkout,
+    criar_preferencia_mercadopago_via_edge,
     get_free_audits_remaining,
     is_activated,
     mensagem_pos_revalidacao,
@@ -155,6 +158,35 @@ def main(page: ft.Page):
     COR_STATUS_LARANJA = "#f97316"
     TAM_STATUS_AUDITORIA = 20  # rótulo principal do veredito (maior que o texto auxiliar)
 
+    def _mostrar_snack(msg: str, *, erro: bool = False) -> None:
+        """Flet 0.8x: usar show_dialog; page.snack_bar legado muitas vezes não aparece no Android."""
+        page.show_dialog(
+            ft.SnackBar(
+                content=ft.Text(msg, size=14),
+                bgcolor=COR_ERRO if erro else COR_CARD,
+                behavior=ft.SnackBarBehavior.FLOATING,
+                duration=ft.Duration(milliseconds=8000),
+            )
+        )
+
+    def _msg_erro_preferencia_mp(codigo: str | None) -> str:
+        if not codigo:
+            return "Não foi possível iniciar o pagamento. Tente de novo."
+        if codigo == "sem_email":
+            return "Defina um e-mail válido na identificação antes de pagar."
+        if codigo == "rede":
+            return "Sem Internet ou o servidor não respondeu. Verifique a ligação."
+        if codigo == "bad_json":
+            return "Resposta inválida do servidor. Tente mais tarde."
+        if codigo == "sem_init_point":
+            return (
+                "O servidor não devolveu o link de pagamento. "
+                "Confirme se a função create_mercadopago_payment está em deploy no Supabase."
+            )
+        if codigo.startswith("http_"):
+            return f"Servidor de pagamento respondeu com erro ({codigo})."
+        return f"Não foi possível iniciar o pagamento ({codigo})."
+
     def _cor_historico_status(st: str) -> str:
         if "RASCUNHO" in st:
             return COR_ALERTA
@@ -201,9 +233,22 @@ def main(page: ft.Page):
         visible=False,
     )
 
+    _ref_btn_compra: dict[str, ft.Container | None] = {"aud": None, "ativ": None}
+
+    def _sync_btn_comprar_licenca_visibility() -> None:
+        vis = (
+            (not is_activated(pasta_usuario))
+            and get_free_audits_remaining(pasta_usuario) <= 0
+        )
+        for k in ("aud", "ativ"):
+            ctl = _ref_btn_compra.get(k)
+            if ctl is not None:
+                ctl.visible = vis
+
     def _sync_banner_trial():
         if is_activated(pasta_usuario):
             lbl_modo_trial.visible = False
+            _sync_btn_comprar_licenca_visibility()
             return
         r = get_free_audits_remaining(pasta_usuario)
         lbl_modo_trial.visible = True
@@ -211,6 +256,7 @@ def main(page: ft.Page):
             f"Modo avaliação: {r} de {FREE_AUDITS_LIMIT} auditorias grátis. "
             "Depois é necessário licença ou pagamento."
         )
+        _sync_btn_comprar_licenca_visibility()
 
     # =====================================================================
     # TELA DE ATIVAÇÃO (LICENÇA)
@@ -320,20 +366,59 @@ def main(page: ft.Page):
         page.run_task(_go)
 
     def _evt_japaguei(_):
-        lbl_ativacao.value = "A verificar licença neste aparelho…"
-        lbl_ativacao.color = COR_TEXTO_SEC
-        page.update()
-        ok, msg = try_claim_license_after_mercadopago(pasta_usuario)
-        if ok:
-            lbl_ativacao.value = msg if msg else "Licença activada neste aparelho."
-            lbl_ativacao.color = COR_SUCESSO
-            _sync_banner_trial()
+        """Após Mercado Pago: primeiro valida por e-mail+aparelho (RPC validar_acesso); depois tenta claim por chave."""
+        async def _go():
+            lbl_ativacao.value = "A verificar licença neste aparelho…"
+            lbl_ativacao.color = COR_TEXTO_SEC
+            _set_botoes_ativacao(True)
             page.update()
-            navegar_para(tela_capa)
-        else:
-            lbl_ativacao.value = msg or "Não foi possível confirmar ainda."
-            lbl_ativacao.color = COR_ERRO
-            page.update()
+            try:
+                resposta, erro_val = await asyncio.to_thread(
+                    lambda: chamar_validar_acesso_apos_checkout(
+                        max_tentativas=5, intervalo_seg=2.0
+                    )
+                )
+                if erro_val == "rede":
+                    lbl_ativacao.value = "Sem ligação. Tente de novo."
+                    lbl_ativacao.color = COR_ERRO
+                    return
+                if not erro_val and resposta and resposta.get("status") == "liberado":
+                    lbl_ativacao.value = "Acesso liberado."
+                    lbl_ativacao.color = COR_SUCESSO
+                    _sync_banner_trial()
+                    navegar_para(tela_capa, servidor_liberou_capa=True)
+                    return
+
+                ok, msg = await asyncio.to_thread(
+                    try_claim_license_after_mercadopago, pasta_usuario
+                )
+                if ok:
+                    lbl_ativacao.value = msg if msg else "Licença activada neste aparelho."
+                    lbl_ativacao.color = COR_SUCESSO
+                    _sync_banner_trial()
+                    navegar_para(tela_capa)
+                    return
+
+                parte = ""
+                if resposta and resposta.get("status") == "bloqueado":
+                    parte = str(resposta.get("mensagem") or "").strip()
+                if parte and msg:
+                    lbl_ativacao.value = f"{parte} — {msg}"
+                elif msg:
+                    lbl_ativacao.value = msg
+                elif parte:
+                    lbl_ativacao.value = parte
+                else:
+                    lbl_ativacao.value = (
+                        "Pagamento não refletiu ainda nesta conta. Confirme o mesmo e-mail na app "
+                        "e no Mercado Pago; pode levar até 1–2 min após pagar."
+                    )
+                lbl_ativacao.color = COR_ERRO
+            finally:
+                _set_botoes_ativacao(False)
+                page.update()
+
+        page.run_task(_go)
 
     btn_mp = _btn_licenca(
         "ABRIR PAGAMENTO (MERCADO PAGO)",
@@ -349,6 +434,51 @@ def main(page: ft.Page):
         _evt_japaguei,
         46,
     )
+
+    def _evt_comprar_licenca(_):
+        async def _go():
+            try:
+                em = get_email_salvo() or ""
+                if not email_basico_valido(em):
+                    _mostrar_snack(
+                        "Defina um e-mail válido na identificação antes de pagar.",
+                        erro=True,
+                    )
+                    return
+
+                ini, err = await asyncio.to_thread(criar_preferencia_mercadopago_via_edge, em)
+                if ini:
+                    try:
+                        await page.launch_url(ini)
+                    except Exception as ex:
+                        _mostrar_snack(
+                            f"Não foi possível abrir o pagamento no navegador: {ex!s}",
+                            erro=True,
+                        )
+                else:
+                    _mostrar_snack(_msg_erro_preferencia_mp(err), erro=True)
+            except Exception as ex:
+                _mostrar_snack(f"Erro inesperado: {ex!s}", erro=True)
+
+        page.run_task(_go)
+
+    btn_comprar_lic_aud = _btn_licenca(
+        "COMPRAR LICENÇA",
+        "#0ea5e9",
+        _evt_comprar_licenca,
+        46,
+    )
+    btn_comprar_lic_aud.visible = False
+    _ref_btn_compra["aud"] = btn_comprar_lic_aud
+
+    btn_comprar_lic_ativ = _btn_licenca(
+        "COMPRAR LICENÇA",
+        "#0ea5e9",
+        _evt_comprar_licenca,
+        46,
+    )
+    btn_comprar_lic_ativ.visible = False
+    _ref_btn_compra["ativ"] = btn_comprar_lic_ativ
 
     img_logo_ativ = _resolver_imagem("icon.png")
     tela_ativacao = ft.SafeArea(
@@ -367,6 +497,8 @@ def main(page: ft.Page):
                 btn_guardar,
                 ft.Container(height=8),
                 btn_entrar,
+                ft.Container(height=6),
+                btn_comprar_lic_ativ,
                 ft.Container(height=6),
                 btn_mp,
                 ft.Container(height=6),
@@ -418,7 +550,33 @@ def main(page: ft.Page):
         tela_destino.visible = True
         if tela_destino is tela_auditoria:
             _sync_banner_trial()
+        elif tela_destino is tela_ativacao:
+            _sync_btn_comprar_licenca_visibility()
         page.update()
+
+    async def _revalidar_acesso_ao_voltar_do_mp():
+        if not tela_ativacao.visible:
+            return
+        if not email_basico_valido(get_email_salvo()):
+            return
+        resposta, erro_val = await asyncio.to_thread(
+            lambda: chamar_validar_acesso_apos_checkout(
+                max_tentativas=4, intervalo_seg=1.5
+            )
+        )
+        if erro_val or not resposta or resposta.get("status") != "liberado":
+            return
+        lbl_ativacao.value = "Pagamento confirmado. Acesso liberado."
+        lbl_ativacao.color = COR_SUCESSO
+        _sync_banner_trial()
+        navegar_para(tela_capa, servidor_liberou_capa=True)
+        page.update()
+
+    def _on_app_lifecycle(e: ft.AppLifecycleStateChangeEvent):
+        if e.state == ft.AppLifecycleState.RESUME:
+            page.run_task(_revalidar_acesso_ao_voltar_do_mp)
+
+    page.on_app_lifecycle_state_change = _on_app_lifecycle
 
     def _continuar_onboarding_email(_):
         raw = (txt_email_ob.value or "").strip()
@@ -661,12 +819,7 @@ def main(page: ft.Page):
 
             cons, err_c = chamar_consumir_auditoria()
             if err_c == "rede":
-                page.snack_bar = ft.SnackBar(
-                    content=ft.Text("Erro ao conectar com o servidor."),
-                    bgcolor=COR_CARD,
-                )
-                page.snack_bar.open = True
-                page.update()
+                _mostrar_snack("Erro ao conectar com o servidor.", erro=True)
                 usar_fallback_local = True
             elif err_c or cons is None:
                 usar_fallback_local = True
@@ -746,6 +899,7 @@ def main(page: ft.Page):
                         "Depois é necessário licença ou pagamento."
                     )
 
+            _sync_btn_comprar_licenca_visibility()
             page.update()
         except Exception as ex:
             texto_msg.value = f"Erro: {str(ex)[:50]}"
@@ -949,6 +1103,7 @@ def main(page: ft.Page):
             [
                 cabecalho_auditoria,
                 lbl_modo_trial,
+                btn_comprar_lic_aud,
                 bloco_campos,
                 btn_executar,
                 btn_reset,
@@ -1591,12 +1746,7 @@ def main(page: ft.Page):
         resposta, erro_val = chamar_validar_acesso()
 
         if erro_val == "rede":
-            page.snack_bar = ft.SnackBar(
-                content=ft.Text("Erro ao conectar com o servidor."),
-                bgcolor=COR_CARD,
-            )
-            page.snack_bar.open = True
-            page.update()
+            _mostrar_snack("Erro ao conectar com o servidor.", erro=True)
             _abrir_fallback_sem_servidor()
 
         elif erro_val == "sem_email":

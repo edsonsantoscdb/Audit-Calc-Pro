@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleMercadoPagoWebhookRequest } from "../_shared/mercadopago_webhook_core.ts";
 
-/** Alias histórico do mesmo handler; prefira a função `mercadopago_webhook`. */
 serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
