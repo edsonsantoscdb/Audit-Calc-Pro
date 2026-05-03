@@ -1,0 +1,13 @@
+{
+  "_comment": "Exemplo FICTÍCIO para testes. NÃO coloque payloads reais (IDs de utilizador pagamento) no Git.",
+  "action": "payment.created",
+  "api_version": "v1",
+  "data": {
+    "id": "123456789012"
+  },
+  "date_created": "2026-05-03T19:41:42Z",
+  "id": 987654321098,
+  "live_mode": false,
+  "type": "payment",
+  "user_id": "111222333"
+}

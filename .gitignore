@@ -24,12 +24,23 @@ supabase/.temp/
 # Cursor workspace
 .cursor/
 
+# Payloads / testes HTTP locais (podem conter IDs reais do Mercado Pago)
+body.json
+*-webhook-body.json
+
+# Locks do LibreOffice ao editar documentos na pasta do projeto
+.~lock.*
+
 # Docs locais / segredos (não públicos)
 códigos github.txt
 Audit Calc Chave de Ativação.pdf
 "email de envio de chave.odt"
 "senha do gerador de senhas.odt"
 senha gerador de senhas.txt
+"conversa com chatgpt final da programação.odt"
+"link para download audit calc.odt"
+"credenciais no mercado pago.odt"
+audit calc pro link.pdf
 
 # Arquivo grande (>100MB - limite GitHub)
 site google.odt
