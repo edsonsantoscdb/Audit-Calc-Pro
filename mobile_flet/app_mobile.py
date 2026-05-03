@@ -32,6 +32,7 @@ from mobile_flet.supabase_license import (
     get_free_audits_remaining,
     is_activated,
     mensagem_pos_revalidacao,
+    mensagem_falha_rpc_validar_acesso,
     record_successful_free_audit,
     revalidate_license,
 )
@@ -372,19 +373,13 @@ def main(page: ft.Page):
             _set_botoes_ativacao(True)
             page.update()
             try:
-                resposta, erro_val = await asyncio.to_thread(
-                    lambda: chamar_validar_acesso_apos_checkout(
-                        max_tentativas=5, intervalo_seg=2.0
-                    )
-                )
+                resposta, erro_val = await asyncio.to_thread(chamar_validar_acesso_apos_checkout)
                 if erro_val == "rede":
                     lbl_ativacao.value = "Sem ligação. Tente de novo."
                     lbl_ativacao.color = COR_ERRO
                     return
                 if erro_val:
-                    lbl_ativacao.value = (
-                        "Não foi possível consultar o servidor agora. Tente de novo em alguns minutos."
-                    )
+                    lbl_ativacao.value = mensagem_falha_rpc_validar_acesso(erro_val)
                     lbl_ativacao.color = COR_ERRO
                     return
                 if resposta and resposta.get("status") == "liberado":

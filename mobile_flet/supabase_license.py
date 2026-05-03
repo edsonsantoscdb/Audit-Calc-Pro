@@ -601,7 +601,13 @@ def try_claim_license_after_mercadopago(data_dir) -> tuple[bool, str | None]:
     return activate(chave, data_dir)
 
 
-def validar_acesso_remoto(p_email: str, p_device_id: str, tentativas: int = 2) -> tuple[dict | None, str | None]:
+def validar_acesso_remoto(
+    p_email: str,
+    p_device_id: str,
+    tentativas: int = 2,
+    *,
+    timeout_seg: float = 15.0,
+) -> tuple[dict | None, str | None]:
     """
     POST /rest/v1/rpc/validar_acesso
     Retorna ({"status","tipo","usos_restantes","mensagem"}, None) em sucesso ou (None, erro).
@@ -618,7 +624,7 @@ def validar_acesso_remoto(p_email: str, p_device_id: str, tentativas: int = 2) -
     for tentativa in range(tentativas):
         try:
             req = Request(url, data=body, headers=_HEADERS, method="POST")
-            with urlopen(req, timeout=15) as resp:
+            with urlopen(req, timeout=timeout_seg) as resp:
                 raw = resp.read().decode()
                 data = json.loads(raw) if raw.strip() else []
         except HTTPError as e:
@@ -741,31 +747,78 @@ def chamar_validar_acesso() -> tuple[dict | None, str | None]:
     return validar_acesso_remoto(get_email_salvo(), get_device_id())
 
 
+def mensagem_falha_rpc_validar_acesso(erro: str) -> str:
+    """Texto apresentável quando a RPC falha (rede já tratada antes)."""
+    if erro == "sem_email":
+        return (
+            "Sem e-mail neste aparelho. Volte ao primeiro ecrã, confirme o e-mail e tente «JÁ PAGUEI» "
+            "(tem de ser o mesmo e-mail do Mercado Pago)."
+        )
+    low = erro.lower()
+    if erro.startswith("server:401"):
+        return (
+            "O servidor recusou a ligação (credenciais). Atualize a app para a última versão ou "
+            "contacte o suporte."
+        )
+    if erro.startswith("server:403"):
+        return "Acesso negado pelo servidor. Verifique a Internet ou contacte o suporte."
+    if erro.startswith("server:429") or "too many requests" in low:
+        return "Servidor ocupado demasiado rápido. Aguarde 1 minuto e tente de novo."
+    if "resposta vazia" in low:
+        return "Resposta inesperada do servidor. Tente dentro de poucos instantes."
+    if erro.startswith("server:5"):
+        return "O servidor falhou temporariamente. Tente de novo daqui a alguns minutos."
+    if erro.startswith("server:"):
+        partes = erro.split(":", 2)
+        cod = partes[1] if len(partes) > 1 else "?"
+        det = partes[2] if len(partes) > 2 else ""
+        return f"Erro ao falar com o servidor (HTTP {cod}). {det.strip()[:200]}"
+    return erro.strip()[:250] if erro else "Erro ao contactar o servidor."
+
+
 def chamar_validar_acesso_apos_checkout(
     *,
-    max_tentativas: int = 5,
-    intervalo_seg: float = 2.0,
+    max_tentativas: int = 7,
+    intervalo_seg: float = 3.0,
 ) -> tuple[dict | None, str | None]:
     """
-    Igual a chamar_validar_acesso, com várias tentativas espaçadas: o webhook do MP pode atualizar a
-    linha poucos segundos depois de o utilizador regressar ao app.
+    Revalidações após Mercado Pago: retenta apenas quando faz sentido (webhook em atraso).
+    Erros HTTP 4xx não são repetidos de propósito.
     """
     from mobile_flet.app_identity import get_device_id, get_email_salvo
 
-    em = get_email_salvo()
+    em = (get_email_salvo() or "").strip()
+    if not em:
+        return None, "sem_email"
     dev = get_device_id()
     última_resp: dict | None = None
     último_erro: str | None = None
 
     for tentativa in range(max(1, int(max_tentativas))):
-        resp, err = validar_acesso_remoto(em, dev)
+        resp, err = validar_acesso_remoto(
+            em.lower(),
+            dev,
+            tentativas=4,
+            timeout_seg=28.0,
+        )
         última_resp, último_erro = resp, err
+
         if err == "rede":
-            return resp, err
-        if not err and resp and resp.get("status") == "liberado":
+            return última_resp, "rede"
+
+        if err:
+            if err.startswith("server:429") or err.startswith("server:5"):
+                if tentativa < max_tentativas - 1:
+                    time.sleep(max(1.5, float(intervalo_seg)))
+                    continue
+                return última_resp, err
+            return última_resp, err
+
+        if resp and resp.get("status") == "liberado":
             return resp, None
+
         if tentativa < max_tentativas - 1:
-            time.sleep(max(0.4, float(intervalo_seg)))
+            time.sleep(max(0.5, float(intervalo_seg)))
 
     return última_resp, último_erro
 
