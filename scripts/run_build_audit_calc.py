@@ -35,7 +35,7 @@ def _remove_legacy_fat_apk_if_splits_exist() -> None:
 
 
 def _publish_main_apk_as_audit_calc() -> None:
-    """audit_calc.apk = cópia do arm64-v8a (nome único para propaganda / link único)."""
+    """build/apk/audit_calc.apk = arm64 local; releases/install_audit_calc.apk = cópia para GitHub."""
     arm64 = OUT_APK_DIR / "audit_calc-arm64-v8a.apk"
     main_apk = OUT_APK_DIR / "audit_calc.apk"
     if not arm64.is_file():
@@ -51,7 +51,8 @@ def _publish_main_apk_as_audit_calc() -> None:
     # Cópia única para GitHub: apenas o APK (sem .sha1 em releases/).
     rel = ROOT / "releases"
     rel.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(arm64, rel / "audit_calc.apk")
+    shutil.copy2(arm64, rel / "install_audit_calc.apk")
+    (rel / "audit_calc.apk").unlink(missing_ok=True)
     old_sha = rel / "audit_calc.apk.sha1"
     old_sha.unlink(missing_ok=True)
 

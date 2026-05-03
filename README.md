@@ -36,9 +36,14 @@ python mobile_flet/app_mobile.py
 
 ## APK Android (Flet)
 
-**Download do APK publicado (único ficheiro no repositório):**
+**Download oficial (único APK no GitHub)** — mesmo app **Audit Calc**; o nome serve para evitar o telemóvel descarregar uma cópia **antiga** em cache pelo link anterior (~75 MB).
 
-- [releases/audit_calc.apk](https://github.com/edsonsantoscdb/Audit-Calc-Pro/raw/main/releases/audit_calc.apk)
+- **`install_audit_calc.apk`** (≈30–32 MB):  
+  https://github.com/edsonsantoscdb/Audit-Calc-Pro/raw/main/releases/install_audit_calc.apk
+
+Se ao descarregar ainda vir ~75 MB: apagar dados do browser / GitHub, ou usar aba privada.
+
+Link **fixado a um commit** (não usa `main`, útil quando o cache teima): consulte no GitHub o commit mais recente em `releases/install_audit_calc.apk` → “View raw” ou URL `raw.githubusercontent.com/.../<hash-do-commit>/releases/install_audit_calc.apk`.
 
 Para **gerar** o APK localmente (não é enviado ao GitHub automaticamente):
 

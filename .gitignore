@@ -4,9 +4,9 @@ admin_secrets.py
 # Build (APKs, Flutter, site-packages)
 build/
 
-# Releases: apenas um APK no GitHub (`releases/audit_calc.apk`)
+# Releases: apenas um APK no GitHub (`releases/install_audit_calc.apk`; nome novo evita cache de rede do URL antigo)
 releases/*
-!releases/audit_calc.apk
+!releases/install_audit_calc.apk
 # Python
 __pycache__/
 *.pyc
