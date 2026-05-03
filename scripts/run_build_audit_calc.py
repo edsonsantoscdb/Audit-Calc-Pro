@@ -48,6 +48,12 @@ def _publish_main_apk_as_audit_calc() -> None:
         shutil.copy2(h_src, h_dst)
     else:
         h_dst.unlink(missing_ok=True)
+    # Cópia única para GitHub: apenas o APK (sem .sha1 em releases/).
+    rel = ROOT / "releases"
+    rel.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(arm64, rel / "audit_calc.apk")
+    old_sha = rel / "audit_calc.apk.sha1"
+    old_sha.unlink(missing_ok=True)
 
 
 def main() -> int:

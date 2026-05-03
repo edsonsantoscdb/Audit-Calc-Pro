@@ -4,10 +4,9 @@ admin_secrets.py
 # Build (APKs, Flutter, site-packages)
 build/
 
-# Releases: versionar apenas o APK principal (~31 MB ARM64); ignorar outros ficheiros na pasta.
+# Releases: apenas um APK no GitHub (`releases/audit_calc.apk`)
 releases/*
 !releases/audit_calc.apk
-!releases/audit_calc.apk.sha1
 # Python
 __pycache__/
 *.pyc

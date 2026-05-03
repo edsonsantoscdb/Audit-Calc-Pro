@@ -36,16 +36,20 @@ python mobile_flet/app_mobile.py
 
 ## APK Android (Flet)
 
-No Windows, use UTF-8 no terminal antes do build para evitar erro de codificação:
+**Download do APK publicado (único ficheiro no repositório):**
+
+- [releases/audit_calc.apk](https://github.com/edsonsantoscdb/Audit-Calc-Pro/raw/main/releases/audit_calc.apk)
+
+Para **gerar** o APK localmente (não é enviado ao GitHub automaticamente):
 
 ```powershell
 $env:PYTHONIOENCODING='utf-8'
 $env:PYTHONUTF8='1'
 chcp 65001 > $null
-flet build apk
+python scripts/run_build_audit_calc.py
 ```
 
-O APK final fica em `build/apk/`.
+Os artefactos do build ficam em `build/apk/` no teu PC (vários ficheiros por arquitectura); só o ficheiro acima em `releases/` está no GitHub.
 
 ### Imagens de fundo
 
