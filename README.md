@@ -54,7 +54,14 @@ chcp 65001 > $null
 python scripts/run_build_audit_calc.py
 ```
 
-Os artefactos do build ficam em `build/apk/` no teu PC (vários ficheiros por arquitectura); só o ficheiro acima em `releases/` está no GitHub.
+Os artefactos do build ficam em **`build/apk/`**:
+
+- **`audit_calc.apk`** — ARM64 (uso principal em telemóveis actuais); este ficheiro é copiado para **`releases/install_audit_calc.apk`** (único APK no GitHub).
+- **`audit_calc_arm32.apk`** — 32‑bit ARM (cópia do split `armeabi-v7a`).
+- **`audit_calc_x86_64.apk`** — x86_64 (emuladores / casos raros).
+
+Os mesmos três ficam também em **`build/apk_prontos/`**, empacotados em **`build/audit_calc_tres_arquiteturas.zip`** (inclui o `.sha1` do principal para verificação local).
+
 
 ### Imagens de fundo
 

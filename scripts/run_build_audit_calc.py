@@ -2,9 +2,13 @@
 
 Uso: python scripts/run_build_audit_calc.py
 
-Saída em build/apk/:
-- audit_calc.apk — mesmo nome de antes; conteúdo = ARM64 (audit_calc-arm64-v8a.apk), uso principal em telemóveis.
-- audit_calc-armeabi-v7a.apk e audit_calc-x86_64.apk — inalterados (propaganda: contactar para estes).
+Saída em build/apk/ (artefactos do Flet) + cópias com nomes estáveis:
+
+- audit_calc.apk — ARM64 (principal; cópia de audit_calc-arm64-v8a.apk).
+- audit_calc_arm32.apk — cópia de audit_calc-armeabi-v7a.apk (aparelhos 32-bit ARM).
+- audit_calc_x86_64.apk — cópia de audit_calc-x86_64.apk (emuladores / raros x86).
+
+Também: build/apk_prontos/ com os mesmos 3 ficheiros; build/audit_calc_tres_arquiteturas.zip com os 3.
 
 Para o Gerador, use sempre: python scripts/run_build_gerador.py
 """
@@ -17,6 +21,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ICON_MAIN = ROOT / "assets" / "icon.png"
 OUT_APK_DIR = ROOT / "build" / "apk"
+BUILD_DIR = ROOT / "build"
+
+# Dois APKs não-ARM64 com nomes estáveis (para partilha sem depender do sufixo Flet exacto).
+ALIAS_ARM32 = "audit_calc_arm32.apk"
+ALIAS_X86_64 = "audit_calc_x86_64.apk"
 
 
 def _remove_legacy_fat_apk_if_splits_exist() -> None:
@@ -57,6 +66,55 @@ def _publish_main_apk_as_audit_calc() -> None:
     old_sha.unlink(missing_ok=True)
 
 
+def _alias_extra_splits() -> None:
+    """Cria cópias com nomes audit_calc_arm32.apk e audit_calc_x86_64.apk em build/apk/."""
+    v7 = OUT_APK_DIR / "audit_calc-armeabi-v7a.apk"
+    x86 = OUT_APK_DIR / "audit_calc-x86_64.apk"
+    if v7.is_file():
+        shutil.copy2(v7, OUT_APK_DIR / ALIAS_ARM32)
+    else:
+        print(f"Aviso: {v7.name} não gerado — {ALIAS_ARM32} omitido.", file=sys.stderr)
+    if x86.is_file():
+        shutil.copy2(x86, OUT_APK_DIR / ALIAS_X86_64)
+    else:
+        print(f"Aviso: {x86.name} não gerado — {ALIAS_X86_64} omitido.", file=sys.stderr)
+
+
+def _package_prontos_e_zip() -> None:
+    """build/apk_prontos/: os 3 APKs estáveis + ZIP em build/audit_calc_tres_arquiteturas.zip."""
+    prontos = BUILD_DIR / "apk_prontos"
+    prontos.mkdir(parents=True, exist_ok=True)
+    for velho in list(prontos.glob("*")):
+        velho.unlink(missing_ok=True)
+    triple = [
+        ("audit_calc.apk", OUT_APK_DIR / "audit_calc.apk"),
+        (ALIAS_ARM32, OUT_APK_DIR / ALIAS_ARM32),
+        (ALIAS_X86_64, OUT_APK_DIR / ALIAS_X86_64),
+    ]
+    zip_path = BUILD_DIR / "audit_calc_tres_arquiteturas"
+    ok_any = False
+    for nome, caminho in triple:
+        if caminho.is_file():
+            shutil.copy2(caminho, prontos / nome)
+            ok_any = True
+    # Sha1 opcional só do principal para diagnóstico local
+    h = OUT_APK_DIR / "audit_calc.apk.sha1"
+    if h.is_file():
+        shutil.copy2(h, prontos / "audit_calc.apk.sha1")
+    if not ok_any:
+        return
+    # Recria ZIP sempre com o mesmo nome (sem lixo dentro)
+    arquivo = shutil.make_archive(
+        str(zip_path),
+        "zip",
+        root_dir=str(prontos),
+    )
+    # make_archive pode devolver .zip já com nome; garantir só .zip único na raíz build/
+    esperado = Path(str(zip_path) + ".zip")
+    if Path(arquivo) != esperado and Path(arquivo).is_file():
+        shutil.move(arquivo, esperado)
+
+
 def main() -> int:
     if not ICON_MAIN.is_file():
         print(f"Falta {ICON_MAIN} — coloque o ícone da calculadora em assets/icon.png")
@@ -94,14 +152,8 @@ def main() -> int:
         return code
     _remove_legacy_fat_apk_if_splits_exist()
     _publish_main_apk_as_audit_calc()
-    prontos_dir = ROOT / "build" / "apk_prontos"
-    main_apk = OUT_APK_DIR / "audit_calc.apk"
-    if main_apk.is_file():
-        prontos_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(main_apk, prontos_dir / "audit_calc.apk")
-        h = OUT_APK_DIR / "audit_calc.apk.sha1"
-        if h.is_file():
-            shutil.copy2(h, prontos_dir / "audit_calc.apk.sha1")
+    _alias_extra_splits()
+    _package_prontos_e_zip()
     return 0
 
 

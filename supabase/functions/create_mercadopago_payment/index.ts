@@ -77,10 +77,14 @@ serve(async (req) => {
         payer: { email },
         external_reference: email,
         metadata: { audit_calc_email: email },
+        // Placeholder inválido quebra o browser após pagar. Use secrets no Supabase quando tiver site próprio.
         back_urls: {
-          success: "https://seudominio.com/sucesso",
-          failure: "https://seudominio.com/falha",
-          pending: "https://seudominio.com/pendente",
+          success: (Deno.env.get("AUDITCALC_MP_BACK_SUCCESS") ?? "").trim() ||
+            "https://www.mercadopago.com.br/",
+          failure: (Deno.env.get("AUDITCALC_MP_BACK_FAILURE") ?? "").trim() ||
+            "https://www.mercadopago.com.br/",
+          pending: (Deno.env.get("AUDITCALC_MP_BACK_PENDING") ?? "").trim() ||
+            "https://www.mercadopago.com.br/",
         },
         auto_return: "approved",
       }),

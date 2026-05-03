@@ -233,14 +233,18 @@ def main(page: ft.Page):
         visible=False,
     )
 
-    _ref_btn_compra: dict[str, ft.Container | None] = {"aud": None, "ativ": None}
+    _ref_btn_compra: dict[str, ft.Container | None] = {
+        "aud": None,
+        "ativ": None,
+        "jap_aud": None,
+    }
 
     def _sync_btn_comprar_licenca_visibility() -> None:
         vis = (
             (not is_activated(pasta_usuario))
             and get_free_audits_remaining(pasta_usuario) <= 0
         )
-        for k in ("aud", "ativ"):
+        for k in ("aud", "ativ", "jap_aud"):
             ctl = _ref_btn_compra.get(k)
             if ctl is not None:
                 ctl.visible = vis
@@ -317,6 +321,10 @@ def main(page: ft.Page):
             btn_japaguei.disabled = desabilitar
         except Exception:
             pass
+        try:
+            btn_japaguei_aud.disabled = desabilitar
+        except Exception:
+            pass
 
     def _tentar_guardar_chave(_):
         lbl_ativacao.value = "Verificando e gravando…"
@@ -367,24 +375,30 @@ def main(page: ft.Page):
 
     def _evt_japaguei(_):
         """Após Mercado Pago: apenas validar_acesso (e‑mail + device_id). Fluxo por chave = campo próprio."""
+
+        def _texto_activacao(msg: str, cor: str) -> None:
+            lbl_ativacao.value = msg
+            lbl_ativacao.color = cor
+            try:
+                if tela_auditoria.visible:
+                    _mostrar_snack(msg, erro=(cor == COR_ERRO))
+            except Exception:
+                pass
+
         async def _go():
-            lbl_ativacao.value = "A verificar licença neste aparelho…"
-            lbl_ativacao.color = COR_TEXTO_SEC
+            _texto_activacao("A verificar licença neste aparelho…", COR_TEXTO_SEC)
             _set_botoes_ativacao(True)
             page.update()
             try:
                 resposta, erro_val = await asyncio.to_thread(chamar_validar_acesso_apos_checkout)
                 if erro_val == "rede":
-                    lbl_ativacao.value = "Sem ligação. Tente de novo."
-                    lbl_ativacao.color = COR_ERRO
+                    _texto_activacao("Sem ligação. Tente de novo.", COR_ERRO)
                     return
                 if erro_val:
-                    lbl_ativacao.value = mensagem_falha_rpc_validar_acesso(erro_val)
-                    lbl_ativacao.color = COR_ERRO
+                    _texto_activacao(mensagem_falha_rpc_validar_acesso(erro_val), COR_ERRO)
                     return
                 if resposta and resposta.get("status") == "liberado":
-                    lbl_ativacao.value = "Acesso liberado."
-                    lbl_ativacao.color = COR_SUCESSO
+                    _texto_activacao("Acesso liberado.", COR_SUCESSO)
                     _sync_banner_trial()
                     navegar_para(tela_capa, servidor_liberou_capa=True)
                     return
@@ -403,16 +417,16 @@ def main(page: ft.Page):
                             "outro identificador: na base de dados é preciso limpar o vínculo antigo "
                             "(coluna device_id da sua linha em «licencas») ou pedir ao suporte."
                         )
-                    lbl_ativacao.value = parte + extra
+                    msg_final = parte + extra
                 elif parte:
-                    lbl_ativacao.value = parte
+                    msg_final = parte
                 else:
-                    lbl_ativacao.value = (
+                    msg_final = (
                         "Pagamento não refletiu ainda nesta conta. Use o mesmo e-mail na app e no "
                         "Mercado Pago; aguarde 1–2 min e tente de novo. Se já pagou, confira no "
                         "Supabase se o webhook marcou «tipo = pago» para esse e-mail."
                     )
-                lbl_ativacao.color = COR_ERRO
+                _texto_activacao(msg_final, COR_ERRO)
             finally:
                 _set_botoes_ativacao(False)
                 page.update()
@@ -469,6 +483,15 @@ def main(page: ft.Page):
     )
     btn_comprar_lic_aud.visible = False
     _ref_btn_compra["aud"] = btn_comprar_lic_aud
+
+    btn_japaguei_aud = _btn_licenca(
+        "JÁ PAGUEI — VERIFICAR ACESSO",
+        "#475569",
+        _evt_japaguei,
+        46,
+    )
+    btn_japaguei_aud.visible = False
+    _ref_btn_compra["jap_aud"] = btn_japaguei_aud
 
     btn_comprar_lic_ativ = _btn_licenca(
         "COMPRAR LICENÇA",
@@ -554,8 +577,7 @@ def main(page: ft.Page):
         page.update()
 
     async def _revalidar_acesso_ao_voltar_do_mp():
-        if not tela_ativacao.visible:
-            return
+        # Voltar do browser no ecrã de auditoria também deve revalidar (antes só em ativação).
         if not email_basico_valido(get_email_salvo()):
             return
         resposta, erro_val = await asyncio.to_thread(
@@ -1103,6 +1125,7 @@ def main(page: ft.Page):
                 cabecalho_auditoria,
                 lbl_modo_trial,
                 btn_comprar_lic_aud,
+                btn_japaguei_aud,
                 bloco_campos,
                 btn_executar,
                 btn_reset,
