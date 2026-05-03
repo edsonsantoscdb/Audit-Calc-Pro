@@ -31,9 +31,34 @@ module = "main"
 assets_dir = "assets"
 exclude = [
     "desktop", "android", "extras", "build", ".git",
-    ".idea", "__pycache__", "*.odt", "*.egg-info",
+    ".idea", "__pycache__",
+    "*.odt",
+    "**/*.odt",
+    "*.egg-info",
     "requirements.txt", "README.md", ".venv", "venv", "scripts",
     "Gerador de Senhas.png",
+    # Nunca embutir binários / backend no app.zip (antes: APK dentro do APK ~150MB+)
+    "releases",
+    "supabase",
+    "*.apk",
+    "*.aab",
+    "*.pdf",
+    "**/*.pdf",
+    "body.json",
+    "audit_calc.egg-info",
+    "gerador_apk.py",
+    # Ficheiros locais frequentes na raíz (glob *.odt do packager não apanha bem todos os nomes)
+    "credenciais no mercado pago.odt",
+    "conversa com chatgpt final da programação.odt",
+    "email de envio de chave.odt",
+    "link para download audit calc.odt",
+    "manual da calculadora.odt",
+    "roteiro para propaganda.odt",
+    "senha do gerador de senhas.odt",
+    "site google.odt",
+    "audit calc pro link.pdf",
+    ".~lock.link para download audit calc.odt#",
+    ".~lock.site google.odt#",
 ]
 
 [tool.flet.app.boot_screen]

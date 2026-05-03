@@ -2,8 +2,10 @@
 
 Uso: python scripts/run_build_audit_calc.py
 
-O pyproject.toml deve manter icon = "assets/icon.png" para este app.
-Para o Gerador, use sempre: python scripts/run_build_gerador.py (troca para icon_gerador.png).
+Cada APK por CPU (split-per-abi): entregue audit_calc-arm64-v8a.apk à maioria dos telemóveis.
+O pyproject exclui releases/, supabase/, *.apk do pacote Python — evita APK dentro do APK.
+
+Para o Gerador, use sempre: python scripts/run_build_gerador.py
 """
 import os
 import shutil
@@ -13,6 +15,22 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ICON_MAIN = ROOT / "assets" / "icon.png"
+OUT_APK_DIR = ROOT / "build" / "apk"
+
+
+def _remove_legacy_fat_apk_if_splits_exist() -> None:
+    """Com --split-per-abi o Flutter também pode gerar APK universal grande; remover duplicado."""
+    if not OUT_APK_DIR.is_dir():
+        return
+    splits = list(OUT_APK_DIR.glob("audit_calc-*.apk"))
+    fat = OUT_APK_DIR / "audit_calc.apk"
+    if splits and fat.is_file():
+        mb = fat.stat().st_size / (1024 * 1024)
+        if mb > 80:
+            fat.unlink(missing_ok=True)
+            hs = OUT_APK_DIR / "audit_calc.apk.sha1"
+            if hs.is_file():
+                hs.unlink(missing_ok=True)
 
 
 def main() -> int:
@@ -41,10 +59,23 @@ def main() -> int:
         "com.auditcalc",
         "--artifact",
         "audit_calc",
+        "--split-per-abi",
+        "--cleanup-app",
+        "--cleanup-packages",
         "--no-rich-output",
         "--yes",
     ]
-    return subprocess.call(cmd, cwd=ROOT, env=env)
+    code = subprocess.call(cmd, cwd=ROOT, env=env)
+    if code != 0:
+        return code
+    _remove_legacy_fat_apk_if_splits_exist()
+    # Cópia principal para distribuição (telefónicos modernos 64‑bit ARM)
+    arm64 = OUT_APK_DIR / "audit_calc-arm64-v8a.apk"
+    prontos_dir = ROOT / "build" / "apk_prontos"
+    if arm64.is_file():
+        prontos_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(arm64, prontos_dir / "audit_calc.apk")
+    return 0
 
 
 if __name__ == "__main__":
