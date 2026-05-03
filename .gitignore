@@ -34,9 +34,16 @@ body.json
 # Docs locais / segredos (não públicos)
 códigos github.txt
 Audit Calc Chave de Ativação.pdf
+credenciais no mercado pago.odt
+link para download audit calc.odt
+email de envio de chave.odt
+senha do gerador de senhas.odt
+conversa com chatgpt final da programação.odt
+senha gerador de senhas.txt
+
+# Também aceitar nomes com espaços quando o cliente Git exige aspas:
 "email de envio de chave.odt"
 "senha do gerador de senhas.odt"
-senha gerador de senhas.txt
 "conversa com chatgpt final da programação.odt"
 "link para download audit calc.odt"
 "credenciais no mercado pago.odt"
