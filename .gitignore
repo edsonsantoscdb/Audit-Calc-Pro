@@ -4,6 +4,9 @@ admin_secrets.py
 # Build (APKs, Flutter, site-packages)
 build/
 
+# APK empacotados (muitas vezes >100MB — limite GitHub)
+releases/*.apk
+releases/*.apk.sha1
 # Python
 __pycache__/
 *.pyc

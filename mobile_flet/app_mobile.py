@@ -34,7 +34,6 @@ from mobile_flet.supabase_license import (
     mensagem_pos_revalidacao,
     record_successful_free_audit,
     revalidate_license,
-    try_claim_license_after_mercadopago,
 )
 
 
@@ -366,7 +365,7 @@ def main(page: ft.Page):
         page.run_task(_go)
 
     def _evt_japaguei(_):
-        """Após Mercado Pago: primeiro valida por e-mail+aparelho (RPC validar_acesso); depois tenta claim por chave."""
+        """Após Mercado Pago: apenas validar_acesso (e‑mail + device_id). Fluxo por chave = campo próprio."""
         async def _go():
             lbl_ativacao.value = "A verificar licença neste aparelho…"
             lbl_ativacao.color = COR_TEXTO_SEC
@@ -382,36 +381,41 @@ def main(page: ft.Page):
                     lbl_ativacao.value = "Sem ligação. Tente de novo."
                     lbl_ativacao.color = COR_ERRO
                     return
-                if not erro_val and resposta and resposta.get("status") == "liberado":
+                if erro_val:
+                    lbl_ativacao.value = (
+                        "Não foi possível consultar o servidor agora. Tente de novo em alguns minutos."
+                    )
+                    lbl_ativacao.color = COR_ERRO
+                    return
+                if resposta and resposta.get("status") == "liberado":
                     lbl_ativacao.value = "Acesso liberado."
                     lbl_ativacao.color = COR_SUCESSO
                     _sync_banner_trial()
                     navegar_para(tela_capa, servidor_liberou_capa=True)
                     return
 
-                ok, msg = await asyncio.to_thread(
-                    try_claim_license_after_mercadopago, pasta_usuario
-                )
-                if ok:
-                    lbl_ativacao.value = msg if msg else "Licença activada neste aparelho."
-                    lbl_ativacao.color = COR_SUCESSO
-                    _sync_banner_trial()
-                    navegar_para(tela_capa)
-                    return
-
                 parte = ""
                 if resposta and resposta.get("status") == "bloqueado":
                     parte = str(resposta.get("mensagem") or "").strip()
-                if parte and msg:
-                    lbl_ativacao.value = f"{parte} — {msg}"
-                elif msg:
-                    lbl_ativacao.value = msg
+                tipo_linha = str(resposta.get("tipo") or "").strip().lower() if resposta else ""
+
+                if tipo_linha == "pago" and parte:
+                    extra = ""
+                    pl = parte.lower()
+                    if "dispositivo" in pl or "identificador" in pl:
+                        extra = (
+                            " Se acabou de reinstalar ou atualizar a app, o aparelho pode ter "
+                            "outro identificador: na base de dados é preciso limpar o vínculo antigo "
+                            "(coluna device_id da sua linha em «licencas») ou pedir ao suporte."
+                        )
+                    lbl_ativacao.value = parte + extra
                 elif parte:
                     lbl_ativacao.value = parte
                 else:
                     lbl_ativacao.value = (
-                        "Pagamento não refletiu ainda nesta conta. Confirme o mesmo e-mail na app "
-                        "e no Mercado Pago; pode levar até 1–2 min após pagar."
+                        "Pagamento não refletiu ainda nesta conta. Use o mesmo e-mail na app e no "
+                        "Mercado Pago; aguarde 1–2 min e tente de novo. Se já pagou, confira no "
+                        "Supabase se o webhook marcou «tipo = pago» para esse e-mail."
                     )
                 lbl_ativacao.color = COR_ERRO
             finally:
