@@ -261,7 +261,6 @@ def main(page: ft.Page):
         vis = (
             (not is_activated(pasta_usuario))
             and (not _acesso_licenca_por_email_servidor["ativo"])
-            and get_free_audits_remaining(pasta_usuario) <= 0
         )
         for k in ("aud", "ativ", "jap_aud"):
             ctl = _ref_btn_compra.get(k)
@@ -867,7 +866,11 @@ def main(page: ft.Page):
             elif err_c or cons is None:
                 usar_fallback_local = True
             elif cons.get("status") == "bloqueado":
-                msg_b = cons.get("mensagem") or "Não é possível registar esta auditoria."
+                msg_b = cons.get("mensagem") or (
+                    "Não é possível registar esta auditoria no servidor. "
+                    "Se acabaram as auditorias gratuitas nesta conta, ou há desvio quota local vs "
+                    "servidor / dispositivo, use «COMPRAR LICENÇA» ou «JÁ PAGUEI» neste ecran."
+                )
                 lbl_ativacao.value = str(msg_b)
                 lbl_ativacao.color = COR_ERRO
                 navegar_para(tela_ativacao)
