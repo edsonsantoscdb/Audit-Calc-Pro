@@ -584,11 +584,9 @@ def try_claim_license_after_mercadopago(data_dir) -> tuple[bool, str | None]:
     except (URLError, OSError):
         return False, "Sem internet. Conecte-se e tente novamente."
 
+    # Sem linha com pending_android_id = fluxo só por e-mail (validar_acesso), não é erro.
     if not rows:
-        return False, (
-            "Ainda não há licença libertada para este aparelho. "
-            "Aguarde a confirmação do pagamento e tente de novo."
-        )
+        return False, None
 
     row = rows[0] if isinstance(rows, list) else rows
     if not isinstance(row, dict):

@@ -74,4 +74,4 @@ def main(page: ft.Page) -> None:
         page.update()
 
 
-ft.app(main)
+ft.run(main)

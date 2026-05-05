@@ -125,10 +125,28 @@ def main(page: ft.Page):
             app_ativado = False
             licenca_aviso = mensagem_pos_revalidacao(cod_lic)
 
+    # Licença só por e‑mail/Mercado Pago: sem ficheiro .auditcalcpro_licenca.json local.
+    _acesso_licenca_por_email_servidor = {"ativo": False}
+
+    def _sinc_credencial_servidor(validar_resp: dict | None) -> None:
+        """Actualiza permissão quando validar_acesso devolve estado (inclui pagamento só no servidor)."""
+        if not validar_resp:
+            return
+        tipo = str(validar_resp.get("tipo") or "").strip().lower()
+        status = str(validar_resp.get("status") or "").strip().lower()
+        if status == "liberado" and tipo == "pago":
+            _acesso_licenca_por_email_servidor["ativo"] = True
+        elif status == "bloqueado" and tipo == "pago":
+            _acesso_licenca_por_email_servidor["ativo"] = False
+
     def _pode_usar_o_app() -> bool:
         if not email_basico_valido(get_email_salvo()):
             return False
-        return is_activated(pasta_usuario) or get_free_audits_remaining(pasta_usuario) > 0
+        return (
+            is_activated(pasta_usuario)
+            or get_free_audits_remaining(pasta_usuario) > 0
+            or _acesso_licenca_por_email_servidor["ativo"]
+        )
 
     # ==========================================
     # 2. CONFIGURAÇÃO E CORES
@@ -242,6 +260,7 @@ def main(page: ft.Page):
     def _sync_btn_comprar_licenca_visibility() -> None:
         vis = (
             (not is_activated(pasta_usuario))
+            and (not _acesso_licenca_por_email_servidor["ativo"])
             and get_free_audits_remaining(pasta_usuario) <= 0
         )
         for k in ("aud", "ativ", "jap_aud"):
@@ -250,7 +269,7 @@ def main(page: ft.Page):
                 ctl.visible = vis
 
     def _sync_banner_trial():
-        if is_activated(pasta_usuario):
+        if is_activated(pasta_usuario) or _acesso_licenca_por_email_servidor["ativo"]:
             lbl_modo_trial.visible = False
             _sync_btn_comprar_licenca_visibility()
             return
@@ -397,6 +416,8 @@ def main(page: ft.Page):
                 if erro_val:
                     _texto_activacao(mensagem_falha_rpc_validar_acesso(erro_val), COR_ERRO)
                     return
+                if resposta:
+                    _sinc_credencial_servidor(resposta)
                 if resposta and resposta.get("status") == "liberado":
                     _texto_activacao("Acesso liberado.", COR_SUCESSO)
                     _sync_banner_trial()
@@ -587,6 +608,7 @@ def main(page: ft.Page):
         )
         if erro_val or not resposta or resposta.get("status") != "liberado":
             return
+        _sinc_credencial_servidor(resposta)
         lbl_ativacao.value = "Pagamento confirmado. Acesso liberado."
         lbl_ativacao.color = COR_SUCESSO
         _sync_banner_trial()
@@ -1778,12 +1800,14 @@ def main(page: ft.Page):
             _abrir_fallback_sem_servidor()
 
         elif resposta.get("status") == "bloqueado":
+            _sinc_credencial_servidor(resposta)
             msg_serv = resposta.get("mensagem") or "Acesso bloqueado."
             lbl_ativacao.value = str(msg_serv)
             lbl_ativacao.color = COR_ERRO
             navegar_para(tela_ativacao)
 
         elif resposta.get("status") == "liberado":
+            _sinc_credencial_servidor(resposta)
             navegar_para(tela_capa, servidor_liberou_capa=True)
 
         else:
