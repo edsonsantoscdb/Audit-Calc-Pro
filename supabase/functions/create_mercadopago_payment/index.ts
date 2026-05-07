@@ -40,7 +40,7 @@ serve(async (req) => {
     if (!raw || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
       throw new Error("Email inválido");
     }
-    email = raw;
+    email = raw.toLowerCase();
   } catch {
     return new Response(
       JSON.stringify({
@@ -55,6 +55,11 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim().replace(/\/$/, "");
+    const notificationUrl =
+      (Deno.env.get("AUDITCALC_MP_NOTIFICATION_URL") ?? "").trim() ||
+      (supabaseUrl ? `${supabaseUrl}/functions/v1/mercadopago_webhook` : "");
+
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
@@ -77,6 +82,7 @@ serve(async (req) => {
         payer: { email },
         external_reference: email,
         metadata: { audit_calc_email: email },
+        ...(notificationUrl ? { notification_url: notificationUrl } : {}),
         // Placeholder inválido quebra o browser após pagar. Use secrets no Supabase quando tiver site próprio.
         back_urls: {
           success: (Deno.env.get("AUDITCALC_MP_BACK_SUCCESS") ?? "").trim() ||

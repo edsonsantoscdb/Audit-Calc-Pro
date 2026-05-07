@@ -39,5 +39,7 @@ begin
   end if;
 exception
   when duplicate_object then null;
+  when unique_violation then
+    raise notice 'licencas_email_unique nao aplicada: ha e-mails duplicados; migrations posteriores nao dependem de ON CONFLICT(email).';
   when others then raise;
 end $$;

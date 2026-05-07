@@ -2,6 +2,10 @@ import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supa
 
 type WebhookBody = {
   type?: string;
+  topic?: string;
+  action?: string;
+  id?: string | number;
+  resource?: string;
   data?: { id?: string | number };
 };
 
@@ -32,6 +36,13 @@ const POLL_BASE_MS = 900;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function extractPaymentIdFromResource(resource?: string): string {
+  const value = (resource ?? "").trim();
+  if (!value) return "";
+  const match = value.match(/\/payments\/([^/?#]+)/i) ?? value.match(/(\d+)(?:[/?#].*)?$/);
+  return match?.[1] ? String(match[1]).trim() : "";
 }
 
 async function fetchPaymentJson(
@@ -76,14 +87,22 @@ export async function handleMercadoPagoWebhookJson(
     return;
   }
 
-  if (webhook.type !== "payment") {
-    console.log("Ignorando type != payment:", webhook.type);
+  const webhookType =
+    (webhook.type ?? webhook.topic ?? "").trim().toLowerCase() ||
+    ((webhook.action ?? "").trim().toLowerCase().startsWith("payment.") ? "payment" : "");
+
+  if (webhookType !== "payment") {
+    console.log("Ignorando webhook que nao e payment:", {
+      type: webhook.type,
+      topic: webhook.topic,
+      action: webhook.action,
+    });
     return;
   }
 
-  const paymentId = webhook.data?.id;
+  const paymentId = webhook.data?.id ?? webhook.id ?? extractPaymentIdFromResource(webhook.resource);
   if (paymentId == null || paymentId === "") {
-    console.error("Payment ID ausente no webhook");
+    console.error("Payment ID ausente no webhook:", JSON.stringify(webhook).slice(0, 2000));
     return;
   }
 
@@ -167,7 +186,29 @@ export async function handleMercadoPagoWebhookJson(
 }
 
 export async function handleMercadoPagoWebhookRequest(req: Request): Promise<void> {
-  const webhook = (await req.json()) as WebhookBody;
+  const url = new URL(req.url);
+  let webhook: WebhookBody = {};
+
+  try {
+    const parsed = await req.json();
+    webhook = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as WebhookBody
+      : {};
+  } catch {
+    webhook = {};
+  }
+
+  webhook.type ??= url.searchParams.get("type") ?? undefined;
+  webhook.topic ??= url.searchParams.get("topic") ?? undefined;
+  webhook.action ??= url.searchParams.get("action") ?? undefined;
+  webhook.id ??= url.searchParams.get("id") ?? undefined;
+  webhook.resource ??= url.searchParams.get("resource") ?? undefined;
+  webhook.data ??= {};
+  webhook.data.id ??=
+    url.searchParams.get("data.id") ??
+    url.searchParams.get("data_id") ??
+    undefined;
+
   console.log("Webhook recebido:", JSON.stringify(webhook, null, 2));
   await handleMercadoPagoWebhookJson(webhook);
 }

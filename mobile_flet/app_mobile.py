@@ -404,7 +404,7 @@ def main(page: ft.Page):
                 pass
 
         async def _go():
-            _texto_activacao("A verificar licença neste aparelho…", COR_TEXTO_SEC)
+            _texto_activacao("A verificar pagamento pelo e-mail cadastrado...", COR_TEXTO_SEC)
             _set_botoes_ativacao(True)
             page.update()
             try:
@@ -429,15 +429,7 @@ def main(page: ft.Page):
                 tipo_linha = str(resposta.get("tipo") or "").strip().lower() if resposta else ""
 
                 if tipo_linha == "pago" and parte:
-                    extra = ""
-                    pl = parte.lower()
-                    if "dispositivo" in pl or "identificador" in pl:
-                        extra = (
-                            " Se acabou de reinstalar ou atualizar a app, o aparelho pode ter "
-                            "outro identificador: na base de dados é preciso limpar o vínculo antigo "
-                            "(coluna device_id da sua linha em «licencas») ou pedir ao suporte."
-                        )
-                    msg_final = parte + extra
+                    msg_final = parte
                 elif parte:
                     msg_final = parte
                 else:

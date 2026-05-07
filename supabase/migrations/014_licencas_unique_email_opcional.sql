@@ -18,5 +18,7 @@ begin
   end if;
 exception
   when duplicate_object then null;
+  when unique_violation then
+    raise notice 'licencas_email_unique nao aplicada: ha e-mails duplicados; a migration 016 regulariza o fluxo sem depender desta constraint.';
   when others then raise;
 end $$;
