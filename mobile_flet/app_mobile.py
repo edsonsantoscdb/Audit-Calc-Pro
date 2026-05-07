@@ -267,6 +267,13 @@ def main(page: ft.Page):
             if ctl is not None:
                 ctl.visible = vis
 
+    def _abrir_tela_compra(msg: str) -> None:
+        """Leva o utilizador para os botões de compra quando a quota grátis acaba."""
+        lbl_ativacao.value = msg
+        lbl_ativacao.color = COR_ALERTA
+        _sync_btn_comprar_licenca_visibility()
+        navegar_para(tela_ativacao)
+
     def _sync_banner_trial():
         if is_activated(pasta_usuario) or _acesso_licenca_por_email_servidor["ativo"]:
             lbl_modo_trial.visible = False
@@ -488,7 +495,7 @@ def main(page: ft.Page):
         page.run_task(_go)
 
     btn_comprar_lic_aud = _btn_licenca(
-        "COMPRAR LICENÇA",
+        "COMPRAR LICENÇA (MERCADO PAGO)",
         "#0ea5e9",
         _evt_comprar_licenca,
         46,
@@ -506,7 +513,7 @@ def main(page: ft.Page):
     _ref_btn_compra["jap_aud"] = btn_japaguei_aud
 
     btn_comprar_lic_ativ = _btn_licenca(
-        "COMPRAR LICENÇA",
+        "COMPRAR LICENÇA (MERCADO PAGO)",
         "#0ea5e9",
         _evt_comprar_licenca,
         46,
@@ -860,12 +867,10 @@ def main(page: ft.Page):
             elif cons.get("status") == "bloqueado":
                 msg_b = cons.get("mensagem") or (
                     "Não é possível registar esta auditoria no servidor. "
-                    "Se acabaram as auditorias gratuitas nesta conta, ou há desvio quota local vs "
-                    "servidor / dispositivo, use «COMPRAR LICENÇA» ou «JÁ PAGUEI» neste ecran."
+                    "Se acabaram as auditorias gratuitas nesta conta, use "
+                    "«COMPRAR LICENÇA (MERCADO PAGO)» ou «JÁ PAGUEI»."
                 )
-                lbl_ativacao.value = str(msg_b)
-                lbl_ativacao.color = COR_ERRO
-                navegar_para(tela_ativacao)
+                _abrir_tela_compra(str(msg_b))
                 return
             elif cons.get("status") == "liberado":
                 resposta_servidor = cons
@@ -936,6 +941,13 @@ def main(page: ft.Page):
                         f"Modo avaliação: {u_int} de {FREE_AUDITS_LIMIT} auditorias grátis. "
                         "Depois é necessário licença ou pagamento."
                     )
+                    if u_int <= 0:
+                        page.update()
+                        _abrir_tela_compra(
+                            "As 5 auditorias grátis terminaram. "
+                            "Toque em «COMPRAR LICENÇA (MERCADO PAGO)» para liberar o acesso."
+                        )
+                        return
 
             _sync_btn_comprar_licenca_visibility()
             page.update()
