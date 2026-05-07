@@ -78,12 +78,13 @@ serve(async (req) => {
         payment_methods: {
           excluded_payment_methods: [],
           excluded_payment_types: [],
+          installments: 1,
         },
-        payer: { email },
+        // Sem `payer` para não forçar login MP: aceita cartão/Pix/boleto como convidado.
         external_reference: email,
         metadata: { audit_calc_email: email },
         ...(notificationUrl ? { notification_url: notificationUrl } : {}),
-        // Placeholder inválido quebra o browser após pagar. Use secrets no Supabase quando tiver site próprio.
+        // Placeholder válido (https) — auto_return precisa de URLs https; usamos páginas oficiais MP.
         back_urls: {
           success: (Deno.env.get("AUDITCALC_MP_BACK_SUCCESS") ?? "").trim() ||
             "https://www.mercadopago.com.br/",
@@ -92,7 +93,6 @@ serve(async (req) => {
           pending: (Deno.env.get("AUDITCALC_MP_BACK_PENDING") ?? "").trim() ||
             "https://www.mercadopago.com.br/",
         },
-        auto_return: "approved",
       }),
     });
 
