@@ -21,14 +21,14 @@ set search_path = public
 as $$
 declare
   v_email text := lower(trim(both from coalesce(p_email, '')));
-  v_ctid tid;
+  v_id bigint;
 begin
   if v_email = '' then
     raise exception 'email vazio';
   end if;
 
-  select l.ctid
-  into v_ctid
+  select l.id
+  into v_id
   from public.licencas l
   where lower(trim(both from coalesce(l.email, ''))) = v_email
   order by
@@ -39,7 +39,7 @@ begin
   limit 1
   for update;
 
-  if v_ctid is null then
+  if v_id is null then
     insert into public.licencas (email, chave, tipo, usos_restantes, ativo, data_ativacao, created_at)
     values (v_email, 'MP-' || upper(md5(v_email)), 'pago', 0, true, now(), now());
     return;
@@ -53,14 +53,14 @@ begin
     data_ativacao = coalesce(l.data_ativacao, now()),
     created_at = coalesce(l.created_at, now()),
     chave = coalesce(nullif(trim(both from l.chave), ''), 'MP-' || upper(md5(v_email)))
-  where l.ctid = v_ctid;
+  where l.id = v_id;
 
   -- Duplicados do mesmo e-mail normalizado deixam de concorrer com a linha canonica.
   update public.licencas l
   set
     ativo = false
   where lower(trim(both from coalesce(l.email, ''))) = v_email
-    and l.ctid <> v_ctid;
+    and l.id <> v_id;
 end;
 $$;
 
