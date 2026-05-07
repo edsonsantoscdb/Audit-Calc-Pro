@@ -917,37 +917,35 @@ def main(page: ft.Page):
                 texto_diferenca.value = ""
                 texto_diferenca.visible = False
 
-            if not is_activated(pasta_usuario):
-                if usar_fallback_local:
-                    record_successful_free_audit(pasta_usuario)
+            if not is_activated(pasta_usuario) and not _acesso_licenca_por_email_servidor["ativo"]:
+                record_successful_free_audit(pasta_usuario)
+                restantes_local = get_free_audits_remaining(pasta_usuario)
                 usos_serv = (
                     None
                     if resposta_servidor is None
                     else resposta_servidor.get("usos_restantes")
                 )
                 try:
-                    u_int = (
+                    u_serv = (
                         int(usos_serv)
                         if usos_serv is not None and str(usos_serv).strip() != ""
                         else None
                     )
                 except (TypeError, ValueError):
-                    u_int = None
-                if u_int is None:
-                    _sync_banner_trial()
-                else:
-                    lbl_modo_trial.visible = True
-                    lbl_modo_trial.value = (
-                        f"Modo avaliação: {u_int} de {FREE_AUDITS_LIMIT} auditorias grátis. "
-                        "Depois é necessário licença ou pagamento."
+                    u_serv = None
+                restantes = restantes_local if u_serv is None else min(restantes_local, u_serv)
+                lbl_modo_trial.visible = True
+                lbl_modo_trial.value = (
+                    f"Modo avaliação: {restantes} de {FREE_AUDITS_LIMIT} auditorias grátis. "
+                    "Depois é necessário licença ou pagamento."
+                )
+                if restantes <= 0:
+                    page.update()
+                    _abrir_tela_compra(
+                        "As 5 auditorias grátis terminaram. "
+                        "Toque em «COMPRAR LICENÇA (MERCADO PAGO)» para liberar o acesso."
                     )
-                    if u_int <= 0:
-                        page.update()
-                        _abrir_tela_compra(
-                            "As 5 auditorias grátis terminaram. "
-                            "Toque em «COMPRAR LICENÇA (MERCADO PAGO)» para liberar o acesso."
-                        )
-                        return
+                    return
 
             _sync_btn_comprar_licenca_visibility()
             page.update()
