@@ -30,7 +30,7 @@ MERCADOPAGO_CHECKOUT_URL = os.environ.get("AUDITCALC_MP_CHECKOUT_URL", "").strip
 
 PAYMENT_MODE = "test"  # "test" ou "prod"
 
-unit_price = 5.00  # referência; cobrança = link MP ou Edge Function (valor teste/alíquota; produção pode subir)
+unit_price = 69.90  # referência; cobrança real definida na Edge Function create_mercadopago_payment (Supabase)
 title = "Audit Calc - Licença Vitalícia"
 
 # Preferência MP: campo "metadata" (ex.: {"metadata": metadata} no JSON).

@@ -72,7 +72,7 @@ serve(async (req) => {
             title: "Licença Audit Calc",
             quantity: 1,
             currency_id: "BRL",
-            unit_price: 1.0,
+            unit_price: 69.90,
           },
         ],
         payment_methods: {
