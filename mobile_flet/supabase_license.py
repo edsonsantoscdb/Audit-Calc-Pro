@@ -37,7 +37,7 @@ title = "Audit Calc - Licença Vitalícia"
 metadata = {"mode": PAYMENT_MODE}
 
 # Modo gratuito: conta auditorias bem-sucedidas (resultado válido, não erro de formulário).
-FREE_AUDITS_LIMIT = 5
+FREE_AUDITS_LIMIT = 3
 
 _TRIAL_FILE = ".auditcalc_trial.json"
 

@@ -547,7 +547,7 @@ def main(page: ft.Page):
                 lbl_ativacao,
                 ft.Container(expand=True),
                 ft.Text(
-                    "Pode testar com até 5 auditorias grátis (botão EXECUTAR AUDITORIA) antes de comprar.",
+                    "Pode testar com até 3 auditorias grátis (botão EXECUTAR AUDITORIA) antes de comprar.",
                     size=11, color="#64748b", text_align=ft.TextAlign.CENTER, width=320,
                 ),
                 ft.Text(
@@ -942,7 +942,7 @@ def main(page: ft.Page):
                 if restantes <= 0:
                     page.update()
                     _abrir_tela_compra(
-                        "As 5 auditorias grátis terminaram. "
+                        "As 3 auditorias grátis terminaram. "
                         "Toque em «COMPRAR LICENÇA (MERCADO PAGO)» para liberar o acesso."
                     )
                     return
